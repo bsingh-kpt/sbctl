@@ -4,24 +4,53 @@ import (
 	"crypto"
 	"crypto/x509"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/foxboron/sbctl/logging"
 	"github.com/go-piv/piv-go/v2/piv"
+	"golang.org/x/term"
 )
 
 // A type to wrap piv.Yubikey to manage the yubikey handle
 type YubikeyReader struct {
 	key       *piv.YubiKey
 	Overwrite bool
+	Pin       string
+	PinPrompt bool
 }
 
-func (y *YubikeyReader) GetPIVKeyCert() (*x509.Certificate, error) {
+func (y *YubikeyReader) GetManagementKey() ([]byte, error) {
+	var err error
+	if err = y.connectToYubikey(); err != nil {
+		return nil, err
+	}
+	if y.Pin == "" && y.PinPrompt {
+		y.Pin, err = pinPrompt()
+		if err != nil {
+			return nil, err
+		}
+	}
+	m, err := y.key.Metadata(y.Pin)
+	if err != nil {
+		return nil, err
+	}
+	return *m.ManagementKey, nil
+}
+
+func (y *YubikeyReader) GetPIVKeyCert(slot piv.Slot) (*x509.Certificate, error) {
 	if err := y.connectToYubikey(); err != nil {
 		return nil, err
 	}
-	return y.key.Attest(piv.SlotSignature)
+	return y.key.Certificate(slot)
+}
+
+func (y *YubikeyReader) GetPIVAttestationCert(slot piv.Slot) (*x509.Certificate, error) {
+	if err := y.connectToYubikey(); err != nil {
+		return nil, err
+	}
+	return y.key.Attest(slot)
 }
 
 func (y *YubikeyReader) GenerateKey(key []byte, slot piv.Slot, opts piv.Key) (crypto.PublicKey, error) {
@@ -31,7 +60,15 @@ func (y *YubikeyReader) GenerateKey(key []byte, slot piv.Slot, opts piv.Key) (cr
 	return y.key.GenerateKey(key, slot, opts)
 }
 
-func (y *YubikeyReader) PrivateKey(slot piv.Slot, public crypto.PublicKey, auth piv.KeyAuth) (crypto.PrivateKey, error) {
+func (y *YubikeyReader) PrivateKey(slot piv.Slot, public crypto.PublicKey) (crypto.PrivateKey, error) {
+	var err error
+	if y.Pin == "" && y.PinPrompt {
+		y.Pin, err = pinPrompt()
+		if err != nil {
+			return nil, err
+		}
+	}
+	auth := piv.KeyAuth{PIN: y.Pin}
 	if err := y.connectToYubikey(); err != nil {
 		return nil, err
 	}
@@ -93,4 +130,20 @@ func (y *YubikeyReader) Close() error {
 		return y.key.Close()
 	}
 	return nil
+}
+
+func pinPrompt() (string, error) {
+	fmt.Print("Enter PIN: ")
+	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Println()
+	if err != nil {
+		return "", fmt.Errorf("yubikey: PIN read failed")
+	}
+
+	pin := strings.TrimSpace(string(bytePassword))
+	if pin == "" {
+		return "", fmt.Errorf("yubikey: no PIN provided")
+	}
+
+	return pin, nil
 }
