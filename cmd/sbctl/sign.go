@@ -72,6 +72,16 @@ var signCmd = &cobra.Command{
 			}
 		}
 
+		if cmdOptions.PinPrompt {
+			state.Yubikey.PinPrompt = true
+		} else {
+			if pin, found := os.LookupEnv("SBCTL_YUBIKEY_PIN"); found {
+				state.Yubikey.Pin = pin
+			} else {
+				logging.Warn("Yubikey PIN not provided")
+			}
+		}
+
 		if state.Config.Landlock {
 			lsm.RestrictAdditionalPaths(rules...)
 			if err := lsm.Restrict(); err != nil {

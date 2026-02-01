@@ -28,7 +28,6 @@ var (
 	KEKSubject       string
 	DbSubject        string
 	OverwriteYubikey bool
-	pinPrompt        bool
 )
 
 var createKeysCmd = &cobra.Command{
@@ -63,7 +62,7 @@ func RunCreateKeys(state *config.State) error {
 		state.Yubikey.Overwrite = true
 	}
 
-	if pinPrompt {
+	if cmdOptions.PinPrompt {
 		state.Yubikey.PinPrompt = true
 	} else {
 		if pin, found := os.LookupEnv("SBCTL_YUBIKEY_PIN"); found {
@@ -167,7 +166,6 @@ func createKeysCmdFlags(cmd *cobra.Command) {
 	f.StringVarP(&PKSubject, "pk-subj", "", "", "Subject DN for Platform Key certificate (default: /CN=Platform Key/C=WW/)")
 	f.StringVarP(&KEKSubject, "kek-subj", "", "", "Subject DN for Key Exchange Key certificate (default: /CN=Key Exchange Key/C=WW/)")
 	f.StringVarP(&DbSubject, "db-subj", "", "", "Subject DN for Database Key certificate (default: /CN=Database Key/C=WW/)")
-	f.BoolVar(&pinPrompt, "prompt", false, "enables Yubikey PIN prompt")
 }
 
 func init() {

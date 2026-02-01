@@ -24,7 +24,9 @@ type CmdOptions struct {
 	JsonOutput      bool
 	QuietOutput     bool
 	Config          string
+	Dir             string
 	DisableLandlock bool
+	PinPrompt       bool
 	Debug           bool
 }
 
@@ -64,6 +66,8 @@ func baseFlags(cmd *cobra.Command) {
 	flags.BoolVar(&cmdOptions.DisableLandlock, "disable-landlock", false, "Disable landlock sandboxing")
 	flags.BoolVar(&cmdOptions.Debug, "debug", false, "Enable verbose debug logging")
 	flags.StringVarP(&cmdOptions.Config, "config", "", "", "Path to configuration file")
+	flags.StringVarP(&cmdOptions.Dir, "dir", "", "", "Path to base directory")
+	flags.BoolVar(&cmdOptions.PinPrompt, "pin-prompt", false, "enables Yubikey PIN prompt")
 }
 
 func JsonOut(v interface{}) error {
@@ -109,7 +113,17 @@ func main() {
 
 		var conf *config.Config
 
-		if cmdOptions.Config != "" {
+		if cmdOptions.Dir != "" {
+			dir, err := fs.Stat(cmdOptions.Dir)
+			if err != nil {
+				return err
+			}
+			if !dir.IsDir() {
+				return fmt.Errorf("Error: '%s' not a directory", cmdOptions.Dir)
+			}
+			conf = config.MkConfig(cmdOptions.Dir)
+			state.Config = conf
+		} else if cmdOptions.Config != "" {
 			b, err := os.ReadFile(cmdOptions.Config)
 			if err != nil {
 				return err

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -107,6 +108,16 @@ func RunRotateKeys(cmd *cobra.Command, args []string) error {
 		}
 		if err := lsm.Restrict(); err != nil {
 			return err
+		}
+	}
+
+	if cmdOptions.PinPrompt {
+		state.Yubikey.PinPrompt = true
+	} else {
+		if pin, found := os.LookupEnv("SBCTL_YUBIKEY_PIN"); found {
+			state.Yubikey.Pin = pin
+		} else {
+			logging.Warn("Yubikey PIN not provided")
 		}
 	}
 
